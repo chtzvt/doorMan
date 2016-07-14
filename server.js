@@ -11,8 +11,8 @@ var CONFIG = {
             sensor_pin: 0,
             lockout: false,
             human_name: "Left Door",
-            lift_ctl: '',
-            sensor_ctl: ''
+            lift_ctl: {write: ''},
+            sensor_ctl: {read: ''}
         }
     ],
     http_port: 8080
@@ -23,11 +23,12 @@ parseConfig();
 http.createServer(function(req, res) {
 
     if (req.method === "GET") {
-        console.log("Called " + req.url + " for door number: " + call.query.id);
 
         var call = url.parse(req.url, true);
 
-        if (CONFIG.doors[call.query.id] === undefined) {
+        console.log("Called " + req.url + " for door number: " + call.query.id);
+
+        if (CONFIG.doors[call.query.id] === undefined && call.pathname != "/get/list") {
             res.writeHead(200);
             res.end(JSON.stringify({
                 error: "no such door"
@@ -38,7 +39,7 @@ http.createServer(function(req, res) {
             case "/get/state":
                 res.writeHead(200);
                 var state = {
-                    state: CONFIG.doors[call.query.id].lift_ctl.read(),
+                    state: CONFIG.doors[call.query.id].sensor_ctl.read(),
                     lockout: CONFIG.doors[call.query.id].lockout
                 };
                 res.end(JSON.stringify(state));
@@ -119,7 +120,7 @@ function parseConfig() {
 function strip_gpioCtl(doors) {
     var strippedList = [];
     for (var i = 0; i < doors.length; i++) {
-        var newDoor = Object.create(doors[i]);
+        var newDoor = JSON.parse(JSON.stringify(doors[i]));
         delete newDoor.lift_ctl;
         delete newDoor.sensor_ctl;
         strippedList[i] = newDoor;
@@ -133,7 +134,7 @@ function strip_gpioCtl(doors) {
 // 	initialState - initial state the door MUST be in in order for command to be sent.
 // 	bypass - bypass state check (optional)
 function tripCircuit(id, initialState, bypass) {
-    if (bypass === true || CONFIG.doors[call.query.id].sensor_ctl.read() == initialState) {
+    if (bypass === true || CONFIG.doors[id].sensor_ctl.read() == initialState) {
         // Close relay
         CONFIG.doors[id].lift_ctl.write(1);
         // Sleep for 1 second
