@@ -1,5 +1,5 @@
 var req = require('requests');
-var dsyc = require('deasync');
+var dsync = require('deasync');
 
 function DoorController(config) {
     this.controller_host = config.host;
@@ -22,8 +22,33 @@ DoorController.prototype.lockout = function(doorId) {
     this.sendCommand('lockout', doorId);
 }
 
+// Asynchronously queries API for state of specified door.
+// State: true/false -> open/closed
+DoorController.prototype.getState = function(doorId, callback) {
+    request.get(this.controller_host + '/get/state?id=' + doorId, function(error, response, body) {
+        if (error || response.statusCode != 200) {
+            console.log('[doorControl] QUERY STATE id: ' + this.id + ' got status code ' + response.statusCode + ' and exited with error: ' + error);
+            return;
+        }
+
+        body = JSON.parse(body);
+
+        if (!body.error)
+	    cb(null, body.state);
+        else {
+            console.log('[doorControl] QUERY STATE id: ' + this.id + ' failed with error: ' + JSON.stringify(body));
+            cb(body.error, undefined);
+	}
+
+    }.bind({
+        id: doorId,
+	cb: callback
+    }));
+}
+
 // Synchronously queries API for state of specified door.
 // State: true/false -> open/closed
+// Does nothing on error.
 DoorController.prototype.getStateSync = function(doorId) {
     var state;
     request.get(this.controller_host + '/get/state?id=' + doorId, function(error, response, body) {
@@ -43,7 +68,7 @@ DoorController.prototype.getStateSync = function(doorId) {
     }));
 
     while (state === undefined) {
-        dsyc.runLoopOnce();
+        dsync.runLoopOnce();
     }
 
     return state;
@@ -67,7 +92,7 @@ DoorController.prototype.enumerateDoorsSync = function() {
     });
 
     while (doors === undefined) {
-        dsyc.runLoopOnce();
+        dsync.runLoopOnce();
     }
 
     return doors;
