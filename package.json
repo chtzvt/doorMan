@@ -1,0 +1,36 @@
+{
+  "name": "doorMan",
+  "version": "1.0.0",
+  "description": "REST API and client library for controlling garage doors using C.H.I.P.",
+  "keywords": [
+    "Node.js",
+    "C.H.I.P.",
+    "home-automation",
+    "garage-door"
+  ],
+  "author": {
+    "name": "Charlton Trezevant",
+    "url": "https://www.ctis.me/"
+  },
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+
+  "engines": {
+    "node": ">= 0.6.0",
+    "npm": ">= 1.0.0"
+  },
+
+  "dependencies": {
+    "chip-gpio": "~1.0.1",
+    "sleep": "~3.0.1",
+    "requests": "~0.1.7",
+    "deasync": "0.1.7"
+  },
+
+  "devDependencies": {},
+  "bundleDependencies": [],
+  "private": false,
+  "main": "main.js"
+}
