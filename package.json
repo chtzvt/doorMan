@@ -24,7 +24,6 @@
 
   "dependencies": {
     "chip-gpio": "~1.0.1",
-    "sleep": "~3.0.1",
     "requests": "~0.1.7",
     "deasync": "0.1.7"
   },
