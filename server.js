@@ -75,7 +75,7 @@ http.createServer(function(req, res) {
             case "/set/open": // Open door ONLY if door currently closed. 
                 res.writeHead(200);
                 res.end(JSON.stringify({
-                    command_sent: true
+                    command_sent: !CONFIG.DOORS[call.query.id].lockout //inverse of lockout state determines if command sent, therefore if not locked then cmd is sent
                 }));
                 tripCircuit(call.query.id, 0, false);
                 break;
@@ -83,7 +83,7 @@ http.createServer(function(req, res) {
             case "/set/close": // Close door ONLY if door currently open.
                 res.writeHead(200);
                 res.end(JSON.stringify({
-                    command_sent: true
+                    command_sent: !CONFIG.DOORS[call.query.id].lockout
                 }));
                 tripCircuit(call.query.id, 1, false);
                 break;
@@ -91,7 +91,7 @@ http.createServer(function(req, res) {
             case "/set/cycle": // Cycle door state by sending command regardless of sensor reading
                 res.writeHead(200);
                 res.end(JSON.stringify({
-                    command_sent: true
+                    command_sent: !CONFIG.DOORS[call.query.id].lockout
                 }));
                 tripCircuit(call.query.id, null, true); 
                 break;
@@ -99,7 +99,7 @@ http.createServer(function(req, res) {
             case "/set/lockout": // Closes door and disables DoorControl API
                 res.writeHead(200);
                 res.end(JSON.stringify({
-                    command_sent: true
+                    command_sent: !CONFIG.DOORS[call.query.id].lockout
                 }));
                 tripCircuit(call.query.id, 1, false);
                 CONFIG.DOORS[call.query.id].lockout = true; // set lockout flag
