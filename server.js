@@ -186,6 +186,11 @@ function checkAuthorization(method, api_key, request){
 // 	initialState - door state that must be satisfied in order to send command (e.g. switch position: 1 -> closed, 0 -> open)
 // 	bypass - bypass state check (optional)
 function tripCircuit(id, initialState, bypass) {
+
+    // Never trip circuit on lockout 
+    if(CONFIG.DOORS[id].lockout === true)
+        return;
+
     if (bypass === true || CONFIG.DOORS[id].sensor_ctl.read() == initialState) {
 
         CONFIG.DOORS[id].lift_ctl.write(1); // Ensure that power is OFF initially.
