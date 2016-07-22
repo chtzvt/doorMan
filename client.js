@@ -2,10 +2,14 @@ var request = require('http');
 var dsync = require('deasync');
 
 var controller_host = "";
+var api_key = ""
 var statusMonitors = {};
 
 function DoorController(config) {
     controller_host = config.host;
+
+    if(config.api_key)
+      api_key = "&api_key=" + config.api_key;
 }
 
 DoorController.prototype.open = function(doorId) {
@@ -27,7 +31,7 @@ DoorController.prototype.lockout = function(doorId) {
 // Asynchronously queries API for state of specified door.
 // State: true/false -> open/closed
 DoorController.prototype.getState = function(doorId, callback) {
-    request.get(controller_host + '/get/state?id=' + doorId, function(response) {
+    request.get(controller_host + '/get/state?id=' + doorId + api_key, function(response) {
         if (response.statusCode != 200) {
             console.log('[doorControl] QUERY STATE id: ' + this.id + ' got status code ' + response.statusCode + ' and exited with an error.');
             return;
@@ -65,7 +69,7 @@ DoorController.prototype.getState = function(doorId, callback) {
 // Does nothing on error.
 DoorController.prototype.getStateSync = function(doorId) {
     var state;
-    request.get(controller_host + '/get/state?id=' + doorId, function(response) {
+    request.get(controller_host + '/get/state?id=' + doorId + api_key, function(response) {
         if (response.statusCode != 200) {
             console.log('[doorControl] QUERY STATE id: ' + this.id + ' got status code ' + response.statusCode + ' and exited with an error.');
             return;
@@ -103,7 +107,7 @@ DoorController.prototype.getStateSync = function(doorId) {
 // Synchronously queries API for IDs of available doors.
 DoorController.prototype.enumerateDoorsSync = function() {
     var doors;
-    request.get(controller_host + '/get/list', function(response) {
+    request.get(controller_host + '/get/list' + api_key, function(response) {
         if (response.statusCode != 200) {
             console.log('[doorControl] QUERY STATE id: ' + id + ' got status code ' + response.statusCode + ' and exited with an error.');
             return;
@@ -135,6 +139,39 @@ DoorController.prototype.enumerateDoorsSync = function() {
     return doors;
 };
 
+// Asynchronously enumerates doors.
+DoorController.prototype.enumerateDoors = function(callback) {
+    request.get(controller_host + '/get/list' + api_key, function(response) {
+        if (response.statusCode != 200) {
+            console.log('[doorControl] QUERY DOOR LIST: got status code ' + response.statusCode + ' and exited with an error.');
+            return;
+        }
+
+        var body = '';
+        response.on('data', function(d) {
+            body += d;
+        });
+
+        response.on('end', function() {
+
+            body = JSON.parse(body);
+
+            if (!body.error)
+                cb(null, body.state);
+            else {
+                console.log('[doorControl] QUERY DOOR LIST: failed with error: ' + JSON.stringify(body));
+                cb(body.error, undefined);
+            }
+        }.bind({
+            body: body,
+            cb: cb
+        }));
+
+    }.bind({
+        cb: callback
+    }));
+};
+
 // Monitors the status of the specified door at the specified interval, returns event emitter.
 DoorController.prototype.monitorStatus = function(doorId, timeout) {
     var emitter = new(require('events').EventEmitter);
@@ -162,7 +199,7 @@ DoorController.prototype.destroyMonitor = function(monitorId) {
 };
 
 var watchState = function(doorId, doorInfo) {
-    request.get(controller_host + '/get/state?id=' + doorId, function(response) {
+    request.get(controller_host + '/get/state?id=' + doorId + api_key, function(response) {
         if (response.statusCode != 200) {
             console.log('[doorControl] QUERY STATE id: ' + id + ' got status code ' + response.statusCode + ' and exited with an error.');
             return;
@@ -217,7 +254,7 @@ var watchState = function(doorId, doorInfo) {
 
 // Sends open/close/lockout/etc command to API for specified door. Performs no success checks or error handling.
 DoorController.prototype.sendCommand = function(command, doorId) {
-    request.get(controller_host + '/set/' + command + '?id=' + doorId, function(response) {
+    request.get(controller_host + '/set/' + command + '?id=' + doorId + api_key, function(response) {
         if (response.statusCode != 200) {
             console.log('[doorControl] OPEN id: ' + this.id + ' got status code ' + response.statusCode + ' and exited with an error.');
             return;

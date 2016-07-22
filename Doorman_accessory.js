@@ -3,23 +3,26 @@ var Service = require('../').Service;
 var Characteristic = require('../').Characteristic;
 var uuid = require('../').uuid;
 
-// this interfaces with the garage door opener API
-var DoorController = require("../dctl.js");
-var dctl = new DoorController({host:'http://localhost:8080'});
-var doorTarget = dctl.enumerateDoorsSync().list[0].id || 0;
+// Interface with the garage door opener API
+var DoorController = require("../lib/Doorman_DoorCtl.js");
+// Default API server is localhost on port 8080, but this can be any server. For example, you might run
+// the HAP server on a different networked device than the C.H.I.P. itself.
+var dctl = new DoorController({host:'http://localhost:8080', api_key: 'default'});
+// By default, we use door ID 0. If you want other doors, their IDs can be retrieved using the dctl.enumerateDoorsSync() method.
+var doorTarget = 0;
 
+// Add a few methods that are useful to HAP 
 dctl.opened = function() {
 	var state = dctl.getStateSync(doorTarget) == 0 ? true : false;
-	console.log("check door state: open? : " + state);
+	console.log("DOORMAN_INFO: Query door state: " + ((state == true) ? "open" : "closed"));
 	return state;
 };
 dctl.identify = function() {
-    console.log("Identified.");
+    console.log("DOORMAN_INFO: Identified.");
 //    dctl.cycle();
 };
 
-
-console.log("Initial state is: " + dctl.opened);
+console.log("DOORMAN_INFO: Initial door state is " + ((dctl.opened() == true) ? "open" : "closed"));
 
 var garageUUID = uuid.generate('hap-nodejs:accessories:garage');
 var garage = exports.accessory = new Accessory('Garage Door', garageUUID);
@@ -70,11 +73,8 @@ garage
     var err = null;
 
     if (dctl.opened()) {
-      console.log("Query state: door open");
       callback(err, Characteristic.CurrentDoorState.OPEN);
     } else {
-      console.log("Query state: door closed");
       callback(err, Characteristic.CurrentDoorState.CLOSED);
     }
 });
-
