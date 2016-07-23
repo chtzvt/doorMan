@@ -36,6 +36,9 @@ http.createServer(function(req, res) {
 
         console.log("Called " + req.url + " for door number: " + call.query.id);
 
+        // allow any origin to make API calls.
+        res.setHeader('Access-Control-Allow-Origin', '*');
+
         // Validate request for door availability and 
         if (!/^-?\d+\.?\d*$/.test(call.query.id) || typeof CONFIG.DOORS[call.query.id] === "undefined" && call.pathname !== "/get/list") {
             res.writeHead(400);
