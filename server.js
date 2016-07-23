@@ -156,6 +156,10 @@ function strip_gpioCtl(doors) {
 function checkAuthorization(method, api_key, request) {
     var authorizedKeys = [];
 
+    // strips ipv6 prefix from remoteAddress 
+    var rawIP = request.connection.remoteAddress;
+    var clientIP = rawIP.slice(rawIP.lastIndexOf(':') + 1, rawIP.length);
+
     // Populate authorized key list
     for (var i = 0; i < CONFIG.AUTHORIZED_KEYS.length; i++)
         authorizedKeys[i] = CONFIG.AUTHORIZED_KEYS[i].key;
@@ -171,11 +175,11 @@ function checkAuthorization(method, api_key, request) {
     var keyPos = authorizedKeys.indexOf(api_key);
 
     // If IP address of request source appears on host blacklist
-    if (CONFIG.AUTHORIZED_KEYS[keyPos].denyHosts.indexOf(request.host) >= 0)
+    if (CONFIG.AUTHORIZED_KEYS[keyPos].denyHosts.indexOf(clientIP) >= 0)
         return false;
 
     // If IP address of request source does not match host whitelist and permissions not set to allow ALL hosts
-    if (CONFIG.AUTHORIZED_KEYS[keyPos].allowHosts.indexOf(request.host) == -1 && CONFIG.AUTHORIZED_KEYS[keyPos].allowHosts.indexOf('ALL') == -1)
+    if (CONFIG.AUTHORIZED_KEYS[keyPos].allowHosts.indexOf(clientIP) == -1 && CONFIG.AUTHORIZED_KEYS[keyPos].allowHosts.indexOf('ALL') == -1)
         return false;
 
     // If method called appears on blacklist for API key
