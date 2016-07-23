@@ -10,18 +10,18 @@ var CONFIG = {
             sensor_pin: 7,
             lockout: false,
             human_name: "Left Door",
-            lift_ctl: {write: ''},
-            sensor_ctl: {read: ''}
+            lift_ctl: { write: '' },
+            sensor_ctl: { read: '' }
         }
     ],
-    AUTHORIZED_KEYS: [
-        {
-            name: 'Totally Insecure',
-            key: 'default',
-            allowedHosts: ['ANY'],
-            allowedMethods: ['ALL']
-        }
-    ],
+    AUTHORIZED_KEYS: [{
+        name: 'Totally Insecure',
+        key: 'default',
+        allowHosts: ['ALL'],
+        denyHosts: ['NONE'],
+        allowMethods: ['ALL'],
+        denyMethods: ['NONE']
+    }],
     RELAY_TRIP_TIME: 500, //Time (in ms) to trip relay)
     HTTP_PORT: 8080
 };
@@ -36,22 +36,22 @@ http.createServer(function(req, res) {
 
         console.log("Called " + req.url + " for door number: " + call.query.id);
 
-	// Validate request for door availability and 
+        // Validate request for door availability and 
         if (!/^-?\d+\.?\d*$/.test(call.query.id) || typeof CONFIG.DOORS[call.query.id] === "undefined" && call.pathname !== "/get/list") {
-            	res.writeHead(400);
-            	res.end(JSON.stringify({
-            	    error: "bad request or door does not exist"
-            	}));
-	    	return;
+            res.writeHead(400);
+            res.end(JSON.stringify({
+                error: "bad request or door does not exist"
+            }));
+            return;
         }
 
-	// Check Authorization against authorized applications list
+        // Check Authorization against authorized applications list
         if (!checkAuthorization(call.pathname, call.query.api_key, req)) {
-                res.writeHead(403);
-                res.end(JSON.stringify({
-                    error: "not authorized"
-                }));
-                return;
+            res.writeHead(403);
+            res.end(JSON.stringify({
+                error: "not authorized"
+            }));
+            return;
         }
 
         switch (call.pathname) {
@@ -66,9 +66,8 @@ http.createServer(function(req, res) {
 
             case "/get/list":
                 res.writeHead(200);
-                var list = strip_gpioCtl(CONFIG.DOORS);
                 res.end(JSON.stringify({
-                    list: list
+                    list: strip_gpioCtl(CONFIG.DOORS)
                 }));
                 break;
 
@@ -93,7 +92,7 @@ http.createServer(function(req, res) {
                 res.end(JSON.stringify({
                     command_sent: !CONFIG.DOORS[call.query.id].lockout
                 }));
-                tripCircuit(call.query.id, null, true); 
+                tripCircuit(call.query.id, null, true);
                 break;
 
             case "/set/lockout": // Closes door and disables DoorControl API
@@ -131,7 +130,9 @@ function parseConfig() {
     // Instantiate GPIO controller for each door and attach this to the door object.
     for (var i = 0; i < CONFIG.DOORS.length; i++) {
         CONFIG.DOORS[i].lift_ctl = new gpio(CONFIG.DOORS[i].lift_pin, 'high');
-        CONFIG.DOORS[i].sensor_ctl = new gpio(CONFIG.DOORS[i].sensor_pin, 'in', 'both', {debounceTimeout: 500});
+        CONFIG.DOORS[i].sensor_ctl = new gpio(CONFIG.DOORS[i].sensor_pin, 'in', 'both', {
+            debounceTimeout: 500
+        });
     }
 
     // Ensure that relay state is OFF on server start, for all doors.
@@ -152,30 +153,38 @@ function strip_gpioCtl(doors) {
     return strippedList;
 }
 
-function checkAuthorization(method, api_key, request){
+function checkAuthorization(method, api_key, request) {
     var authorizedKeys = [];
 
     // Populate authorized key list
-    for(var i = 0; i < CONFIG.AUTHORIZED_KEYS.length; i++)
-	authorizedKeys[i] = CONFIG.AUTHORIZED_KEYS[i].key;
+    for (var i = 0; i < CONFIG.AUTHORIZED_KEYS.length; i++)
+        authorizedKeys[i] = CONFIG.AUTHORIZED_KEYS[i].key;
 
     // If no API keys are available, do not enforce rules
-    if(authorizedKeys.length < 1)
+    if (authorizedKeys.length < 1)
         return true;
 
     // If invalid API key supplied
-    if(authorizedKeys.indexOf(api_key) == -1)
-	return false;
+    if (authorizedKeys.indexOf(api_key) == -1)
+        return false;
 
     var keyPos = authorizedKeys.indexOf(api_key);
 
-    // If IP address of request source does not match host whitelist and key not set to allow ALL hosts
-    if(CONFIG.AUTHORIZED_KEYS[keyPos].allowedHosts.indexOf(request.host) == -1 && CONFIG.AUTHORIZED_KEYS[keyPos].allowedHosts.indexOf('ANY') == -1)
-	return false;
+    // If IP address of request source appears on host blacklist
+    if (CONFIG.AUTHORIZED_KEYS[keyPos].denyHosts.indexOf(request.host) >= 0)
+        return false;
 
-    // If requested API method does not match permitted list and permissions not set to allow ANY method
-    if(CONFIG.AUTHORIZED_KEYS[keyPos].allowedMethods.indexOf(method) == -1 && CONFIG.AUTHORIZED_KEYS[keyPos].allowedMethods.indexOf('ALL') == -1)    
-    	return false;
+    // If IP address of request source does not match host whitelist and permissions not set to allow ALL hosts
+    if (CONFIG.AUTHORIZED_KEYS[keyPos].allowHosts.indexOf(request.host) == -1 && CONFIG.AUTHORIZED_KEYS[keyPos].allowHosts.indexOf('ALL') == -1)
+        return false;
+
+    // If method called appears on blacklist for API key
+    if (CONFIG.AUTHORIZED_KEYS[keyPos].denyMethods.indexOf(method) >= 0)
+        return false;
+
+    // If requested API method does not match permitted list and permissions not set to allow ALL methods
+    if (CONFIG.AUTHORIZED_KEYS[keyPos].allowMethods.indexOf(method) == -1 && CONFIG.AUTHORIZED_KEYS[keyPos].allowMethods.indexOf('ALL') == -1)
+        return false;
 
     return true;
 }
@@ -188,18 +197,17 @@ function checkAuthorization(method, api_key, request){
 function tripCircuit(id, initialState, bypass) {
 
     // Never trip circuit on lockout 
-    if(CONFIG.DOORS[id].lockout === true)
+    if (CONFIG.DOORS[id].lockout === true)
         return;
 
     if (bypass === true || CONFIG.DOORS[id].sensor_ctl.read() == initialState) {
 
         CONFIG.DOORS[id].lift_ctl.write(1); // Ensure that power is OFF initially.
 
-	CONFIG.DOORS[id].lift_ctl.write(0); // power ON 
+        CONFIG.DOORS[id].lift_ctl.write(0); // power ON 
 
         setTimeout(function() {
-	        CONFIG.DOORS[id].lift_ctl.write(1); 
-	}, CONFIG.RELAY_TRIP_TIME); // power OFF again after CONFIG.RELAY_TRIP_TIME
+            CONFIG.DOORS[id].lift_ctl.write(1);
+        }, CONFIG.RELAY_TRIP_TIME); // power OFF again after CONFIG.RELAY_TRIP_TIME
     }
 }
-
