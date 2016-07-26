@@ -52,43 +52,53 @@ http.createServer(function(req, res) {
 
         var body = "";
 
+        // Collect POST data from request stream and store it in the body variable
+        // Also ensures that body is not too large.
         req.on('data', function(data) {
             body += data;
             if (body.length > 1e7) {
-                body = ""
-                res.writeHead(413);
-                res.end(JSON.stringify({
-                    "error": "request entity too large"
-                }));
+                body = "";
             }
         });
 
+        // After request has completed, and body has been collected
         req.on('end', function() {
+
+            // If no data was sent, or alternatively if the request entity was too large
             if (body.length === 0) {
+                // Serve an error to the client and halt further processing.
                 res.writeHead(400);
                 res.end(JSON.stringify({
-                    "error": "no POST data"
+                    "error": "no data sent or request entity too large"
                 }));
+                return;
             }
 
             var data = {};
 
+            // Attempt to parse the posted JSON
             try {
                 data = JSON.parse(body);
             } catch (error) {
+                // If the request JSON is malformed, return an error to the client and halt processing.
                 res.writeHead(400);
                 res.end(JSON.stringify({
-                    "error": "malformed JSON"
+                    "error": "malformed JSON supplied"
                 }));
+		return;
             }
 
+            /* Now that basic consistency checks are completed, we can attempt to process the request.
+             * No need to worry about undefined keys in the data object, because the various sanity and
+             * authorization checks at the beginnning of the processRequest function will handle these appropriately. 
+             */
             processRequest(data.method, data.door_id, data.api_key, req, res);
         });
 
     } else {
         res.writeHead(400);
         res.end(JSON.stringify({
-            error: "malformed request"
+            error: "method not implemented"
         }));
     }
 
@@ -97,7 +107,7 @@ http.createServer(function(req, res) {
 })).listen(CONFIG.HTTP_PORT);
 
 function processRequest(method, doorId, api_key, req, res) {
-    // Validate request for door availability and 
+    // Validate request: door ID must be a number, API method must be supplied, requested door must exist in config.
     if (!/^-?\d+\.?\d*$/.test(doorId) || typeof method === "undefined" || typeof CONFIG.DOORS[doorId] === "undefined" && method !== "/get/list") {
         res.writeHead(400);
         res.end(JSON.stringify({
@@ -106,7 +116,7 @@ function processRequest(method, doorId, api_key, req, res) {
         return;
     }
 
-    // Check Authorization against authorized applications list
+    // Check supplied API key against authorized applications list
     if (!checkAuthorization(method, api_key, req)) {
         res.writeHead(403);
         res.end(JSON.stringify({
