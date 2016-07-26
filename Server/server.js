@@ -10,8 +10,12 @@ var CONFIG = {
             sensor_pin: 7,
             lockout: false,
             human_name: "Left Door",
-            lift_ctl: { write: '' },
-            sensor_ctl: { read: '' }
+            lift_ctl: {
+                write: ''
+            },
+            sensor_ctl: {
+                read: ''
+            }
         }
     ],
     AUTHORIZED_KEYS: [{
@@ -39,82 +43,47 @@ http.createServer(function(req, res) {
         // allow any origin to make API calls.
         res.setHeader('Access-Control-Allow-Origin', '*');
 
-        // Validate request for door availability and 
-        if (!/^-?\d+\.?\d*$/.test(call.query.id) || typeof CONFIG.DOORS[call.query.id] === "undefined" && call.pathname !== "/get/list") {
-            res.writeHead(400);
-            res.end(JSON.stringify({
-                error: "bad request or door does not exist"
-            }));
-            return;
-        }
+        processRequest(call.pathname, call.query.id, call.query.api_key, req, res);
 
-        // Check Authorization against authorized applications list
-        if (!checkAuthorization(call.pathname, call.query.api_key, req)) {
-            res.writeHead(403);
-            res.end(JSON.stringify({
-                error: "not authorized"
-            }));
-            return;
-        }
+    } else if (req.method === "POST") {
 
-        switch (call.pathname) {
-            case "/get/state":
-                res.writeHead(200);
-                var state = {
-                    state: CONFIG.DOORS[call.query.id].sensor_ctl.read() == 1 ? 0 : 1, // flip so that 1 -> closed and 0 -> open
-                    lockout: CONFIG.DOORS[call.query.id].lockout
-                };
-                res.end(JSON.stringify(state));
-                break;
+        // allow any origin to make API calls.
+        res.setHeader('Access-Control-Allow-Origin', '*');
 
-            case "/get/list":
-                res.writeHead(200);
+        var body = "";
+
+        req.on('data', function(data) {
+            body += data;
+            if (body.length > 1e7) {
+                body = ""
+                res.writeHead(413);
                 res.end(JSON.stringify({
-                    list: strip_gpioCtl(CONFIG.DOORS)
+                    "error": "request entity too large"
                 }));
-                break;
+            }
+        });
 
-            case "/set/open": // Open door ONLY if door currently closed. 
-                res.writeHead(200);
-                res.end(JSON.stringify({
-                    command_sent: !CONFIG.DOORS[call.query.id].lockout //inverse of lockout state determines if command sent, therefore if not locked then cmd is sent
-                }));
-                tripCircuit(call.query.id, 0, false);
-                break;
-
-            case "/set/close": // Close door ONLY if door currently open.
-                res.writeHead(200);
-                res.end(JSON.stringify({
-                    command_sent: !CONFIG.DOORS[call.query.id].lockout
-                }));
-                tripCircuit(call.query.id, 1, false);
-                break;
-
-            case "/set/cycle": // Cycle door state by sending command regardless of sensor reading
-                res.writeHead(200);
-                res.end(JSON.stringify({
-                    command_sent: !CONFIG.DOORS[call.query.id].lockout
-                }));
-                tripCircuit(call.query.id, null, true);
-                break;
-
-            case "/set/lockout": // Closes door and disables DoorControl API
-                res.writeHead(200);
-                res.end(JSON.stringify({
-                    command_sent: !CONFIG.DOORS[call.query.id].lockout
-                }));
-                tripCircuit(call.query.id, 1, false);
-                CONFIG.DOORS[call.query.id].lockout = true; // set lockout flag
-                break;
-
-            default:
+        req.on('end', function() {
+            if (body.length === 0) {
                 res.writeHead(400);
                 res.end(JSON.stringify({
-                    error: "method not implemented"
+                    "error": "no POST data"
                 }));
-        }
+            }
 
-        console.log("Completed method " + req.url + " for door number: " + call.query.id);
+            var data = {};
+
+            try {
+                data = JSON.parse(body);
+            } catch (error) {
+                res.writeHead(400);
+                res.end(JSON.stringify({
+                    "error": "malformed JSON"
+                }));
+            }
+
+            processRequest(data.method, data.door_id, data.api_key, req, res);
+        });
 
     } else {
         res.writeHead(400);
@@ -126,6 +95,85 @@ http.createServer(function(req, res) {
 }.bind({
     CONFIG: CONFIG
 })).listen(CONFIG.HTTP_PORT);
+
+function processRequest(method, doorId, api_key, req, res) {
+    // Validate request for door availability and 
+    if (!/^-?\d+\.?\d*$/.test(doorId) || typeof method === "undefined" || typeof CONFIG.DOORS[doorId] === "undefined" && method !== "/get/list") {
+        res.writeHead(400);
+        res.end(JSON.stringify({
+            error: "bad request or door does not exist"
+        }));
+        return;
+    }
+
+    // Check Authorization against authorized applications list
+    if (!checkAuthorization(method, api_key, req)) {
+        res.writeHead(403);
+        res.end(JSON.stringify({
+            error: "not authorized"
+        }));
+        return;
+    }
+
+    switch (method) {
+        case "/get/state":
+            res.writeHead(200);
+            var state = {
+                state: CONFIG.DOORS[doorId].sensor_ctl.read() == 1 ? 0 : 1, // flip so that 1 -> closed and 0 -> open
+                lockout: CONFIG.DOORS[doorId].lockout
+            };
+            res.end(JSON.stringify(state));
+            break;
+
+        case "/get/list":
+            res.writeHead(200);
+            res.end(JSON.stringify({
+                list: strip_gpioCtl(CONFIG.DOORS)
+            }));
+            break;
+
+        case "/set/open": // Open door ONLY if door currently closed. 
+            res.writeHead(200);
+            res.end(JSON.stringify({
+                command_sent: !CONFIG.DOORS[doorId].lockout //inverse of lockout state determines if command sent, therefore if not locked then cmd is sent
+            }));
+            tripCircuit(doorId, 0, false);
+            break;
+
+        case "/set/close": // Close door ONLY if door currently open.
+            res.writeHead(200);
+            res.end(JSON.stringify({
+                command_sent: !CONFIG.DOORS[doorId].lockout
+            }));
+            tripCircuit(doorId, 1, false);
+            break;
+
+        case "/set/cycle": // Cycle door state by sending command regardless of sensor reading
+            res.writeHead(200);
+            res.end(JSON.stringify({
+                command_sent: !CONFIG.DOORS[doorId].lockout
+            }));
+            tripCircuit(doorId, null, true);
+            break;
+
+        case "/set/lockout": // Closes door and disables DoorControl API
+            res.writeHead(200);
+            res.end(JSON.stringify({
+                command_sent: !CONFIG.DOORS[doorId].lockout
+            }));
+            tripCircuit(doorId, 1, false);
+            CONFIG.DOORS[doorId].lockout = true; // set lockout flag
+            break;
+
+        default:
+            res.writeHead(400);
+            res.end(JSON.stringify({
+                error: "method not implemented"
+            }));
+    }
+
+    console.log("Completed method " + method + " for door ID " + doorId + " with key: " + api_key);
+}
 
 // Parses configuration object, configures GPIO control for each door programmatically. 
 // Also sets default GPIO state
