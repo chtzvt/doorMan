@@ -1,0 +1,27 @@
+GetStatus is the garage door open
+GetStatus is the garage door closed
+GetStatus is the garage door locked
+GetStatus is my garage door open
+GetStatus is my garage door closed
+GetStatus is my garage door locked
+GetStatus is the garage open
+GetStatus is the garage closed
+GetStatus is the garage locked
+GetStatus is my garage open
+GetStatus is my garage closed
+GetStatus is my garage locked
+OpenDoor open the garage door
+OpenDoor open my garage door
+OpenDoor open the garage
+OpenDoor open my garage
+OpenDoor open the pod bay doors
+CloseDoor close the garage door
+CloseDoor close my garage door
+CloseDoor close the garage
+CloseDoor close my garage
+CloseDoor close the pod bay doors
+CycleDoor cycle the garage door
+CycleDoor cycle my garage door
+CycleDoor cycle the garage
+CycleDoor cycle my garage
+CycleDoor cycle the pod bay doors

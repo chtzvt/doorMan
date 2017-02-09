@@ -1,0 +1,16 @@
+{
+  "intents": [
+    {
+      "intent": "GetStatus"
+    },
+    {
+      "intent": "OpenDoor"
+    },
+    {
+      "intent": "CloseDoor"
+    },
+    {
+      "intent": "CycleDoor"
+    }
+  ]
+}
